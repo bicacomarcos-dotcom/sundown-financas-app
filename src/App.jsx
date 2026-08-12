@@ -888,7 +888,10 @@ function TelaNovaSenha({ onConcluido }) {
     const { error } = await supabase.auth.updateUser({ password: senha });
     setCarregando(false);
     if (error) {
-      setErro(`Não foi possível salvar a nova senha: ${error.message}`);
+      const mensagem = error.message?.includes("different from the old password")
+        ? "A nova senha precisa ser diferente da senha atual."
+        : "Não foi possível salvar a nova senha. Peça um novo link de recuperação.";
+      setErro(mensagem);
       return;
     }
     setSucesso(true);
