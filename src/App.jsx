@@ -864,6 +864,116 @@ function TelaLogin({ onLogin, onAdminLogin }) {
 }
 
 /* ============================================================
+   TELA — CRIAR NOVA SENHA (fluxo de "esqueci minha senha")
+   Aparece quando o usuário clica no link de recuperação do e-mail.
+   ============================================================ */
+function TelaNovaSenha({ onConcluido }) {
+  const [senha, setSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [sucesso, setSucesso] = useState(false);
+
+  const salvarNovaSenha = async () => {
+    setErro("");
+    if (senha.length < 6) {
+      setErro("A senha precisa ter pelo menos 6 caracteres.");
+      return;
+    }
+    if (senha !== confirmarSenha) {
+      setErro("As senhas não coincidem.");
+      return;
+    }
+    setCarregando(true);
+    const { error } = await supabase.auth.updateUser({ password: senha });
+    setCarregando(false);
+    if (error) {
+      setErro("Não foi possível salvar a nova senha. Peça um novo link de recuperação.");
+      return;
+    }
+    setSucesso(true);
+  };
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: `radial-gradient(circle at 20% 20%, ${BRAND.orangeLight} 0%, ${BRAND.mist} 55%)`,
+        padding: 20,
+      }}
+    >
+      <div style={{ width: "100%", maxWidth: 380 }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div
+            style={{
+              width: 56, height: 56, borderRadius: 16, background: BRAND.orange,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              margin: "0 auto 16px", boxShadow: `0 8px 24px ${BRAND.orange}55`,
+            }}
+          >
+            <PiggyBank size={28} color="#fff" />
+          </div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: BRAND.ink, margin: 0 }}>
+            Criar nova senha
+          </h1>
+          <p style={{ fontSize: 13.5, color: BRAND.slate, marginTop: 6 }}>
+            Digite sua nova senha de acesso.
+          </p>
+        </div>
+
+        <Card style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {sucesso ? (
+            <>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: "#EEF7F1", borderRadius: 10, padding: 12 }}>
+                <Check size={16} color={BRAND.green} style={{ flexShrink: 0, marginTop: 1 }} />
+                <p style={{ fontSize: 12.5, color: BRAND.green, margin: 0, lineHeight: 1.5 }}>
+                  Senha alterada com sucesso! Já pode entrar com a nova senha.
+                </p>
+              </div>
+              <button
+                onClick={onConcluido}
+                style={{ background: BRAND.orange, color: "#fff", border: "none", borderRadius: 10, padding: "12px 16px", fontSize: 14.5, fontWeight: 600, cursor: "pointer" }}
+              >
+                Ir para o login
+              </button>
+            </>
+          ) : (
+            <>
+              <Field label="Nova senha">
+                <CampoSenha value={senha} onChange={(e) => setSenha(e.target.value)} />
+              </Field>
+              <Field label="Confirmar nova senha">
+                <CampoSenha value={confirmarSenha} onChange={(e) => setConfirmarSenha(e.target.value)} />
+              </Field>
+              {erro && (
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: "#FCEEEE", borderRadius: 10, padding: 10 }}>
+                  <AlertCircle size={15} color={BRAND.red} style={{ flexShrink: 0, marginTop: 1 }} />
+                  <p style={{ fontSize: 12, color: BRAND.red, margin: 0, lineHeight: 1.4 }}>{erro}</p>
+                </div>
+              )}
+              <button
+                onClick={salvarNovaSenha}
+                disabled={carregando}
+                style={{
+                  background: carregando ? BRAND.line : BRAND.orange, color: "#fff", border: "none",
+                  borderRadius: 10, padding: "12px 16px", fontSize: 14.5, fontWeight: 600,
+                  cursor: carregando ? "not-allowed" : "pointer",
+                }}
+              >
+                {carregando ? "Salvando..." : "Salvar nova senha"}
+              </button>
+            </>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    LAYOUT COM MENU LATERAL (cliente)
    ============================================================ */
 function Shell({ aba, setAba, onLogout, children, nome, onLancamentoRapido }) {
@@ -3020,6 +3130,7 @@ function OportunidadeItem({ titulo, texto }) {
    ============================================================ */
 export default function App() {
   const [sessao, setSessao] = useState(null); // null | { tipo: 'cliente'|'admin', cliente? }
+  const [modoRecuperacaoSenha, setModoRecuperacaoSenha] = useState(false);
   const [aba, setAba] = useState("dashboard");
   const [transacoes, setTransacoes] = useState([]);
   const [metas, setMetas] = useState([]);
@@ -3033,6 +3144,17 @@ export default function App() {
     await supabase.auth.signOut();
     setSessao(null);
   };
+
+  // Detecta quando o usuário chega pelo link de "esqueci minha senha".
+  // O Supabase processa o token da URL e dispara o evento PASSWORD_RECOVERY.
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setModoRecuperacaoSenha(true);
+      }
+    });
+    return () => listener?.subscription?.unsubscribe();
+  }, []);
 
   // ---------- TRANSAÇÕES (lançamentos + custo fixo) ----------
   const carregarTransacoes = async (clienteId) => {
@@ -3339,6 +3461,20 @@ export default function App() {
   }, [carregandoDados]);
 
   const fontStack = `'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+
+  if (modoRecuperacaoSenha) {
+    return (
+      <div style={{ fontFamily: fontStack }}>
+        <TelaNovaSenha
+          onConcluido={async () => {
+            setModoRecuperacaoSenha(false);
+            await supabase.auth.signOut();
+            window.location.hash = "";
+          }}
+        />
+      </div>
+    );
+  }
 
   if (!sessao) {
     return (
