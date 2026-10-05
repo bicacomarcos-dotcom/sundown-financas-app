@@ -1,0 +1,15 @@
+name: Manter Supabase ativo
+
+on:
+  schedule:
+    - cron: '0 12 * * *'   # todo dia as 12:00 UTC
+  workflow_dispatch:        # permite rodar manualmente
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consulta simples ao banco
+        run: |
+          curl -fsS "https://hftprrbsxlwsfbqvfesq.supabase.co/rest/v1/perfis?select=id&limit=1" \
+            -H "apikey: sb_publishable_38mMXBmcdhM1XBEAGAvLfA_l9dW4iI8"
